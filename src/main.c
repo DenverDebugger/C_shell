@@ -3,18 +3,13 @@
  * @Date: 4/27/2026
  * TSH - Tiny Shell
  *************************************************************************/
-
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 /* This is the core loop of the shell */
-do {
-	printf(">>>> ");
-	line = tsh_read_line();
-	args = tsh_split_line(line);
-	status = tsh_execute(args);
-
-	free(line);
-	free(args);
-} while (status);
 
 #define TSH_RL_BUFSIZE 1024
 char *tsh_read_line(void)
@@ -95,11 +90,10 @@ int tsh_launch(char **args)
 		// child process
 		if (execvp(args[0], args) == -1) {
 			perror("tsh: error with execvp");
-		}
-		exit(EXIT_FAILURE);
-	} else if { (pid < 0) 
-		//error forking
-		perror("tsh: error forking");
+			exit(EXIT_FAILURE);
+		} else if (pid < 0) {
+			//error forking
+			perror("tsh: error forking");
 	} else {
 		do { 
 			wpid = waitpid(pid, &status, WUNTRACED);
@@ -108,90 +102,101 @@ int tsh_launch(char **args)
 
 	return 1;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+}
+
+/* Function declarations for shell builtins */
+int tsh_cd(char **args);
+int tsh_help(char **args);
+int tsh_exit(char **args);
+
+/* list of builtin commands */
+char *builtin_str[] = {
+	"cd",
+	"help",
+	"exit"
+};
+
+int (*builtin_func[])(char **) = {
+	&tsh_cd, 
+	&tsh_help,
+	&tsh_exit
+};
+
+int tsh_num_builtins() {
+	return sizeof(builtin_str) / sizeof(char *);
+}
+
+/* Builtin function implementations */
+
+int tsh_cd(char **args)
+{
+	if (args[1] == NULL ) {
+		fprintf(stderr, "tsh: expected argument to \"cd\"\n");
+	} else {
+		if (chdir(args[1]) != 0) {
+			perror("tsh");
+		}
+	}
+	return 1;
+}
+
+int tsh_help (char **args)
+{
+	int i; 
+	printf("Denver Cowan's TSH (Tiny Shell)\n");
+	printf("Type program names and arguments, and hit enter.\n");
+	printf("The following are built in: \n");
+
+	for (i = 0; i < tsh_num_builtins(); i++) {
+		printf(" %s\n", builtin_str[i]);
+	}
+
+	printf("Use the man command for information of other programs.\n");
+	return 1;
+}
+
+int tsh_exit(char **args) {
+	return 0;
+}
+
+int tsh_execute(char **args)
+{
+	int i; 
+	
+	if (args[0] == NULL) {
+		// empty command was entered
+		return 1;
+	}
+
+	for (i = 0; i < tsh_num_builtins(); i++) {
+		if (strcmp(args[0], builtin_str[i]) == 0) {
+			return (*builtin_func[i])(args);
+		}
+	}
+
+	return tsh_launch(args);
+}
+
+void tsh_loop(void)
+{
+	char *line;
+	char **args;
+	int status;
+
+	do {
+		printf(">>>> ");
+		line = tsh_read_line();
+		args = tsh_split_line(line);
+		status = tsh_execute(args);
+
+		free(line);
+		free(args);
+	} while (status);
+}
+
+int main(int argc, char **argv)
+{
+	tsh_loop();
+	return EXIT_SUCCESS;
+}
 
