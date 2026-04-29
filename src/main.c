@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /* This is the core loop of the shell */
 
@@ -48,6 +50,7 @@ char *tsh_read_line(void)
 
 #define TSH_TOK_BUFSIZE 64
 #define TSH_TOK_DELIM " \t\r\n\a"
+char *outfile = NULL;
 char **tsh_split_line(char *line)
 {
 	int bufsize = 64;
@@ -61,8 +64,23 @@ char **tsh_split_line(char *line)
 		exit(EXIT_FAILURE);
 	}
 
+	outfile = NULL;
+
+
 	token = strtok(line, TSH_TOK_DELIM);
 	while (token != NULL) {
+		if (strcmp(token, ">") == 0) {
+			token = strtok(NULL, TSH_TOK_DELIM);
+
+			if (token == NULL) {
+				fprintf(stderr, "tsh: expected filename after >\n");
+				tokens[position] = NULL;
+				return tokens;
+			}
+			outfile = token;
+			break;
+		}
+
 		tokens[position] = token;
 		position++;
 
@@ -80,7 +98,7 @@ char **tsh_split_line(char *line)
 	return tokens;
 }
 
-int tsh_launch(char **args)
+int tsh_launch(char **args, char *outfile)
 {
 	pid_t pid, wpid;
 	int status;
@@ -88,6 +106,22 @@ int tsh_launch(char **args)
 	pid = fork();
 	if (pid == 0) {
 		// child process
+		if (outfile != NULL) {
+			int fd = open(outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+			if (fd < 0) {
+				perror("tsh: open");
+				exit(EXIT_FAILURE);
+			}
+
+			if (dup2(fd, STDOUT_FILENO) < 0) { // STDOUT_FILENO == 1
+				perror("tsh: dup2");
+				close(fd);
+				exit(EXIT_FAILURE);
+			}
+			close(fd);
+		}
+
 		if (execvp(args[0], args) == -1) {
 			perror("tsh: error with execvp");
 			exit(EXIT_FAILURE);
@@ -174,9 +208,10 @@ int tsh_execute(char **args)
 		}
 	}
 
-	return tsh_launch(args);
+	return tsh_launch(args, outfile);
 }
 
+/* This is the core loop of the shell */
 void tsh_loop(void)
 {
 	char *line;
