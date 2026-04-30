@@ -9,7 +9,8 @@ Resources:
 2. However, just retyping his tutorial is not goint to be useful for learning, you should really dig into the Portable Operating System Interface (POSIX) found here: https://pubs.opengroup.org/onlinepubs/9699919799/
     - I would recommend at a minimum using the site to search for and read about the system calls being used. (chdir, fork, exec, malloc, etc. )
 3. The C Programming Language by Kernighan and Ritchie (K&R)
-    - I think the end of chapter 7 and then chapter 8 will likely be the most useful for this project. Maybe chapter 5 if you are not familiar with Pointers
+    - I think appendix B will be the most useful.
+    - This book is a piece of history though, so it wouldn't hurt to read/skim it all.  
 4. https://www.learn-c.org/en/Welcome
     - This is a more interactive version of what K&R provides. 
 5. AI 
