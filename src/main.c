@@ -63,6 +63,7 @@ char *tsh_read_line(void) {
 #define TSH_TOK_DELIM " \t\r\n\a"
 char *outfile = NULL;
 char *infile = NULL;
+
 char **tsh_split_line(char *line) {
   int bufsize = 64;
   int position = 0;
@@ -122,6 +123,11 @@ char **tsh_split_line(char *line) {
   tokens[position] = NULL;
   return tokens;
 }
+
+/* function declaration for find_pipe utility */
+int find_pipe(char **args);
+
+
 
 int tsh_launch(char **args, char *outfile, char *infile) {
   pid_t pid, wpid;
@@ -235,6 +241,21 @@ int tsh_execute(char **args) {
   }
 
   return tsh_launch(args, outfile, infile);
+}
+
+/*
+ * @brief this method determines if the input string has a pipe operator
+ * and returns it's position, or -1 if it does not have one.
+ */
+
+int find_pipe(char **args)
+{
+    for (int i = 0; args[i] != NULL; i++) {
+        if (strcmp(args[i], "|") == 0) {
+            return i;
+        }
+    }
+    return -1;
 }
 
 /*
