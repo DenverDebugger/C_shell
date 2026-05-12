@@ -70,7 +70,7 @@ char **tsh_split_line(char *line) {
   char **tokens = malloc(bufsize * sizeof(char *)); // |ptr | ptr
   char *token;                                      //    |     |
                                                     //  "ls"   "-l"
-               //  this is a simple view of how it would be laid out in memory.
+  //  this is a simple view of how it would be laid out in memory.
   if (!tokens) {
     fprintf(stderr, "tsh: token allocation error\n");
     exit(EXIT_FAILURE);
@@ -90,7 +90,7 @@ char **tsh_split_line(char *line) {
         return tokens;
       }
       outfile = token;
-	  token = strtok(NULL, TSH_TOK_DELIM);
+      token = strtok(NULL, TSH_TOK_DELIM);
       continue;
     }
 
@@ -103,9 +103,9 @@ char **tsh_split_line(char *line) {
         return tokens;
       }
       infile = token;
-	  token = strtok(NULL, TSH_TOK_DELIM);
+      token = strtok(NULL, TSH_TOK_DELIM);
       continue;
-	}
+    }
 
     tokens[position] = token;
     position++;
@@ -124,11 +124,9 @@ char **tsh_split_line(char *line) {
   return tokens;
 }
 
-/* function declaration for find_pipe utility */
-int find_pipe(char **args);
-
-
-
+/*
+ * @brief this is the launch function for non-piped commands
+ */
 int tsh_launch(char **args, char *outfile, char *infile) {
   pid_t pid, wpid;
   int status;
@@ -185,6 +183,104 @@ int tsh_launch(char **args, char *outfile, char *infile) {
   return 1;
 }
 
+/* function declaration for find_pipe utility */
+int find_pipe(char **args);
+
+/*
+ * @ brief this is the launch funciton for piped commands
+ */
+int tsh_launch_pipe(char **args) {
+  int pipe_pos = find_pipe(args);
+  if (pipe_pos == -1) {
+    fprintf(stderr, "TSH: no pipe found\n");
+    return 1;
+  }
+
+  args[pipe_pos] = NULL;
+
+  // split the args into two arrays
+  char **left_args = args;
+  char **right_args = &args[pipe_pos + 1];
+
+  if (left_args[0] == NULL || right_args[0] == NULL) {
+    fprintf(stderr, "TSH: invalid pipe\n");
+    return 1;
+  }
+
+  int fd[2];
+
+  // create pipe
+  if (pipe(fd) == -1) {
+    perror("TSH: pipe");
+    return 1;
+  }
+
+  pid_t left_pid = fork();
+  if (left_pid < 0) {
+    perror("tsh: left child fork");
+    close(fd[0]);
+    close(fd[1]);
+    return 1;
+  }
+
+  // left child
+  if (left_pid == 0) {
+
+    // stdout -> pipe write end
+    if (dup2(fd[1], STDOUT_FILENO) == -1) {
+      perror("tsh: left dup2");
+      exit(EXIT_FAILURE);
+    }
+
+    // close unused fds so process doesn't hang
+    close(fd[0]);
+    close(fd[1]);
+
+    execvp(left_args[0], left_args);
+
+    perror("tsh: pipe left child");
+    exit(EXIT_FAILURE);
+  }
+
+  pid_t right_pid = fork();
+  if (right_pid < 0) {
+    perror("tsh: right child fork\n");
+    close(fd[0]);
+    close(fd[1]);
+    return 1;
+  }
+
+  // right child
+  if (right_pid == 0) {
+
+    // stdin <- pipe read end
+    if (dup2(fd[0], STDIN_FILENO) == -1) {
+      perror("TSH: right dup2");
+      exit(EXIT_FAILURE);
+    }
+
+    // close unused fds
+    close(fd[1]);
+    close(fd[0]);
+
+    execvp(right_args[0], right_args);
+
+    perror("tsh: right child pipe");
+
+    exit(EXIT_FAILURE);
+  }
+
+  // parent no longer needs pipe fds
+  close(fd[0]);
+  close(fd[1]);
+
+  // wait for both children
+  waitpid(left_pid, NULL, 0);
+  waitpid(right_pid, NULL, 0);
+
+  return 1;
+}
+
 /* Function declarations for shell builtins */
 int tsh_cd(char **args);
 int tsh_help(char **args);
@@ -234,6 +330,12 @@ int tsh_execute(char **args) {
     return 1;
   }
 
+  // added for running piped commands
+  int pipe_pos = find_pipe(args);
+  if (pipe_pos != -1) {
+    return tsh_launch_pipe(args);
+  }
+
   for (i = 0; i < tsh_num_builtins(); i++) {
     if (strcmp(args[0], builtin_str[i]) == 0) {
       return (*builtin_func[i])(args);
@@ -248,14 +350,13 @@ int tsh_execute(char **args) {
  * and returns it's position, or -1 if it does not have one.
  */
 
-int find_pipe(char **args)
-{
-    for (int i = 0; args[i] != NULL; i++) {
-        if (strcmp(args[i], "|") == 0) {
-            return i;
-        }
+int find_pipe(char **args) {
+  for (int i = 0; args[i] != NULL; i++) {
+    if (strcmp(args[i], "|") == 0) {
+      return i;
     }
-    return -1;
+  }
+  return -1;
 }
 
 /*
