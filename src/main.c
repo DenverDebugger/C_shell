@@ -139,13 +139,13 @@ int tsh_launch(char **args, char *outfile, char *infile) {
 
       if (fd < 0) {
         perror("tsh: open");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
       }
 
       if (dup2(fd, STDOUT_FILENO) < 0) { // STDOUT_FILENO == 1
         perror("tsh: dup2");
         close(fd);
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
       }
       close(fd);
     }
@@ -155,20 +155,20 @@ int tsh_launch(char **args, char *outfile, char *infile) {
 
       if (fd < 0) {
         perror("tsh: open");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
       }
 
       if (dup2(fd, STDIN_FILENO) < 0) { // STDIN_FILENO == 0
         perror("tsh: dup2");
         close(fd);
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
       }
       close(fd);
     }
 
     if (execvp(args[0], args) == -1) {
       perror("tsh: error with execvp");
-      exit(EXIT_FAILURE);
+      _exit(EXIT_FAILURE);
     }
 
   } else if (pid < 0) {
@@ -229,7 +229,7 @@ int tsh_launch_pipe(char **args) {
     // stdout -> pipe write end
     if (dup2(fd[1], STDOUT_FILENO) == -1) {
       perror("tsh: left dup2");
-      exit(EXIT_FAILURE);
+      _exit(EXIT_FAILURE);
     }
 
     // close unused fds so process doesn't hang
@@ -239,7 +239,7 @@ int tsh_launch_pipe(char **args) {
     execvp(left_args[0], left_args);
 
     perror("tsh: pipe left child");
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
 
   pid_t right_pid = fork();
@@ -247,6 +247,7 @@ int tsh_launch_pipe(char **args) {
     perror("tsh: right child fork\n");
     close(fd[0]);
     close(fd[1]);
+    waitpid(left_pid, NULL, 0);
     return 1;
   }
 
@@ -256,7 +257,7 @@ int tsh_launch_pipe(char **args) {
     // stdin <- pipe read end
     if (dup2(fd[0], STDIN_FILENO) == -1) {
       perror("TSH: right dup2");
-      exit(EXIT_FAILURE);
+      _exit(EXIT_FAILURE);
     }
 
     // close unused fds
@@ -266,8 +267,7 @@ int tsh_launch_pipe(char **args) {
     execvp(right_args[0], right_args);
 
     perror("tsh: right child pipe");
-
-    exit(EXIT_FAILURE);
+    _exit(EXIT_FAILURE);
   }
 
   // parent no longer needs pipe fds
