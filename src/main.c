@@ -369,6 +369,8 @@ void tsh_loop(void) {
 
   do {
     printf(">>>> ");
+    // flush stdout so that prompt above does not get stuck in buffer
+    fflush(stdout);
     line = tsh_read_line();
     args = tsh_split_line(line);
     status = tsh_execute(args);
